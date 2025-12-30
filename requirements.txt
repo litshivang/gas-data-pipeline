@@ -1,0 +1,7 @@
+python-dotenv
+requests
+pandas
+sqlalchemy
+psycopg2-binary
+pytz
+loguru
