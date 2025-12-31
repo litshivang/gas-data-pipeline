@@ -9,7 +9,7 @@ def start_scheduler():
 
     scheduler.add_job(
         func=run_national_gas,
-        trigger=IntervalTrigger(minutes=1),
+        trigger=IntervalTrigger(hours=1),
         id="national_gas_ingestion",
         name="Hourly National Gas Ingestion",
         replace_existing=True,
