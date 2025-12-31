@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gas-client"
+version = "0.1.0"
+description = "Python client for National Gas time-series data"
+authors = [{ name = "PrimeTechnoWorks" }]
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "pandas",
+    "sqlalchemy",
+    "psycopg2-binary"
+]
+
+[tool.setuptools.packages.find]
+include = ["gas_client"]
