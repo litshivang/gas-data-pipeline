@@ -5,3 +5,4 @@ sqlalchemy
 psycopg2-binary
 pytz
 loguru
+APScheduler==3.10.4
