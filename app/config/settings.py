@@ -1,5 +1,7 @@
 from dotenv import load_dotenv
 import os
+from sqlalchemy.engine import URL
+
 
 load_dotenv()
 
@@ -14,10 +16,13 @@ class Settings:
 
     @property
     def database_url(self) -> str:
-        return (
-            f"postgresql+psycopg2://{self.DB_USER}:"
-            f"{self.DB_PASSWORD}@{self.DB_HOST}:"
-            f"{self.DB_PORT}/{self.DB_NAME}"
+        return URL.create(
+            drivername="postgresql+psycopg2",
+            username=self.DB_USER,
+            password=self.DB_PASSWORD,   # SAFE: no manual encoding
+            host=self.DB_HOST,
+            port=self.DB_PORT,
+            database=self.DB_NAME,
         )
 
 settings = Settings()
