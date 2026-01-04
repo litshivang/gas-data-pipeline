@@ -1,4 +1,4 @@
-from app.ingestion.run_all import run_national_gas
+from app.ingestion.run_all import ingest_dataset
 
 if __name__ == "__main__":
-    run_national_gas()
+    ingest_dataset("PUBOB637", lookback_days=14)

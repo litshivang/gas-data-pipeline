@@ -17,6 +17,7 @@ def upsert_observations(records: list[dict]) -> None:
             "value": stmt.excluded.value,
             "ingestion_time": stmt.excluded.ingestion_time,
             "quality_flag": stmt.excluded.quality_flag,
+            "raw_payload": stmt.excluded.raw_payload,  # 🔥 ADD THIS
         },
     )
 

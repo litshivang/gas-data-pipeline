@@ -1,6 +1,8 @@
 import pandas as pd
 from datetime import datetime, timedelta
 import pytz
+import pandas as pd
+import math
 
 UTC = pytz.UTC
 LONDON = pytz.timezone("Europe/London")
@@ -17,6 +19,41 @@ def gas_day_to_utc(gas_day: pd.Timestamp) -> datetime:
     )
     return local_dt.astimezone(UTC).replace(minute=0, second=0, microsecond=0)
 
+
+def clean_value(v):
+    if pd.isna(v):
+        return None
+    return v
+
+
+def clean_json_payload(row: dict) -> dict:
+    return {k: clean_value(v) for k, v in row.items()}
+
+
+def transform_ng_csv(df, series_id):
+    records = []
+
+    for _, row in df.iterrows():
+        # 🔥 Skip rows without numeric value
+        if pd.isna(row["Value"]):
+            continue
+
+        raw = clean_json_payload(row.to_dict())
+
+        records.append({
+            "series_id": series_id,
+            "observation_time": pd.to_datetime(
+                row["Applicable For"], dayfirst=True
+            ),
+            "value": float(row["Value"]),
+            "quality_flag": (
+                None if pd.isna(row.get("Quality Indicator"))
+                else str(row.get("Quality Indicator"))
+            ),
+            "raw_payload": raw,
+        })
+
+    return records
 
 
 def transform_demand_csv(df: pd.DataFrame, series_id: str) -> list[dict]:

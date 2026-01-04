@@ -1,5 +1,6 @@
 from sqlalchemy import (
     Column,
+    Integer,
     String,
     DateTime,
     Boolean,
@@ -9,8 +10,13 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import declarative_base
 from datetime import datetime
+from sqlalchemy.dialects.postgresql import JSONB
+
+raw_payload = Column(JSONB)
+
 
 Base = declarative_base()
+
 
 
 class MetaSeries(Base):
@@ -24,6 +30,9 @@ class MetaSeries(Base):
     timezone_source = Column(String, nullable=False)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+    dataset_id = Column(String, nullable=True)
+    data_item = Column(Text, nullable=True)
+    lookback_days = Column(Integer, default=14)
 
 
 class DataObservation(Base):
@@ -37,11 +46,13 @@ class DataObservation(Base):
     )
 
     observation_time = Column(
-        DateTime,
+        DateTime(timezone=True),
         primary_key=True,
         nullable=False,
     )
 
     ingestion_time = Column(DateTime, default=datetime.utcnow)
     value = Column(Float, nullable=False)
-    quality_flag = Column(String, default="ACTUAL")
+    quality_flag = Column(String, default="UNKNOWN")
+
+    raw_payload = Column(JSONB)  # 🔥 REQUIRED

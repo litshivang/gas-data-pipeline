@@ -1,11 +1,15 @@
-from sqlalchemy import text
-from app.db.connection import engine
-from app.utils.logger import logger
+from fastapi import FastAPI
+from app.api.routes import health, series, data
+from app.api.v2.routes import router as v2_router
 
-def test_db_connection():
-    with engine.connect() as conn:
-        result = conn.execute(text("SELECT 1"))
-        logger.info(f"DB connection test result: {result.scalar()}")
 
-if __name__ == "__main__":
-    test_db_connection()
+app = FastAPI(
+    title="Gas Data Platform",
+    version="0.1.0",
+    description="Read-only API for National Gas data"
+)
+
+app.include_router(health.router)
+app.include_router(series.router)
+app.include_router(data.router)
+app.include_router(v2_router)
