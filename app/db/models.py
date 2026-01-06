@@ -32,7 +32,7 @@ class MetaSeries(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     dataset_id = Column(String, nullable=True)
     data_item = Column(Text, nullable=True)
-    lookback_days = Column(Integer, default=14)
+    lookback_days = Column(Integer, default=30)
 
 
 class DataObservation(Base):
