@@ -1,5 +1,5 @@
 /* =========================================================
-   STEP 0 — DATABASE & USER (run as postgres superuser)
+   STEP 0 — DATABASE & USER
    ========================================================= */
 
 CREATE DATABASE gas_data;
@@ -10,14 +10,21 @@ GRANT ALL PRIVILEGES ON DATABASE gas_data TO gas_user;
 
 
 /* =========================================================
-   STEP 1 — CONNECT TO DATABASE
+   STEP 1 — CONNECT
    ========================================================= */
 
 \c gas_data;
 
 
 /* =========================================================
-   STEP 2 — SCHEMA OWNERSHIP & PERMISSIONS
+   STEP 2 — EXTENSIONS
+   ========================================================= */
+
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+
+/* =========================================================
+   STEP 3 — SCHEMA OWNERSHIP
    ========================================================= */
 
 ALTER SCHEMA public OWNER TO gas_user;
@@ -34,14 +41,14 @@ GRANT ALL ON SEQUENCES TO gas_user;
 
 
 /* =========================================================
-   STEP 3 — META SERIES TABLE (CORE REGISTRY)
+   STEP 4 — META SERIES
    ========================================================= */
 
 CREATE TABLE IF NOT EXISTS meta_series (
     series_id TEXT PRIMARY KEY,
     source TEXT NOT NULL,
     source_type TEXT DEFAULT 'NATIONAL_GAS',
-    dataset_id TEXT,
+    dataset_id TEXT NOT NULL,
     data_item TEXT,
     description TEXT,
     unit TEXT NOT NULL,
@@ -55,7 +62,7 @@ CREATE TABLE IF NOT EXISTS meta_series (
 
 
 /* =========================================================
-   STEP 4 — DATA OBSERVATIONS (NORMALIZED TIME SERIES)
+   STEP 5 — DATA OBSERVATIONS
    ========================================================= */
 
 CREATE TABLE IF NOT EXISTS data_observations (
@@ -77,11 +84,11 @@ ON data_observations USING GIN (raw_payload);
 
 
 /* =========================================================
-   STEP 5 — RAW EVENTS (PHASE-2 ZERO-LOSS INGESTION)
+   STEP 6 — RAW EVENTS (ZERO-LOSS)
    ========================================================= */
 
 CREATE TABLE IF NOT EXISTS raw_events (
-    id BIGSERIAL PRIMARY KEY,
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     source TEXT NOT NULL,
     dataset_id TEXT NOT NULL,
     series_hint TEXT,
@@ -98,57 +105,7 @@ ON raw_events USING GIN (raw_payload);
 
 
 /* =========================================================
-   STEP 6 — OPTIONAL SEED DATA (ONLY FOR DEMO / TEST)
-   ========================================================= */
-
-INSERT INTO meta_series (
-    series_id,
-    source,
-    dataset_id,
-    data_item,
-    description,
-    unit,
-    frequency,
-    timezone_source,
-    lookback_days,
-    is_active
-)
-VALUES
-(
-    'UK_NBP_DEMAND',
-    'NATIONAL_GAS',
-    'PUBOB637',
-    'Demand Actual, NTS, D+1',
-    'Demand Actual, NTS, D+1',
-    'mcm',
-    'daily',
-    'Europe/London',
-    7,
-    TRUE
-)
-ON CONFLICT (series_id) DO NOTHING;
-
-
-/* =========================================================
-   STEP 7 — VERIFICATION QUERIES
-   ========================================================= */
-
--- Verify tables
-\dt
-
--- Verify schema
-\d meta_series
-\d data_observations
-\d raw_events
-
--- Verify ingestion
-SELECT dataset_id, COUNT(*) FROM raw_events GROUP BY dataset_id;
-
-SELECT series_id, COUNT(*) FROM data_observations GROUP BY series_id;
-
-
-/* =========================================================
-   STEP 8 — CREATE FIELD_CATALOG TABLE 
+   STEP 7 — FIELD CATALOG (DISCOVERY)
    ========================================================= */
 
 CREATE TABLE IF NOT EXISTS field_catalog (
@@ -160,3 +117,24 @@ CREATE TABLE IF NOT EXISTS field_catalog (
     first_seen_at TIMESTAMP DEFAULT NOW(),
     PRIMARY KEY (dataset_id, field_name)
 );
+
+
+ALTER TABLE raw_events
+ADD COLUMN source TEXT NOT NULL DEFAULT 'NATIONAL_GAS';
+
+ALTER TABLE raw_events
+ADD COLUMN series_hint TEXT;
+
+ALTER TABLE raw_events
+ADD COLUMN event_time TIMESTAMP;
+
+
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO gas_user;
+GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO gas_user;
+
+
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+GRANT ALL ON TABLES TO gas_user;
+
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+GRANT ALL ON SEQUENCES TO gas_user;
