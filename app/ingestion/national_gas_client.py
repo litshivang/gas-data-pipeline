@@ -17,12 +17,19 @@ class NationalGasClient:
         logger.info(f"Fetching dataset={dataset_id} via {url}")
 
         if dataset_id == "GAS_QUALITY":
+            if last_days != 1:
+                logger.warning(
+                    "GAS_QUALITY API only supports 'latest' snapshot. "
+                    "lookback_days is ignored. Historical data is not available "
+                    "from this endpoint."
+                )
             return self._fetch_gas_quality(url)
 
         if dataset_id == "ENTSOG":
             return self._fetch_entsog(url, last_days)
 
         raise ValueError(f"No handler for dataset_id={dataset_id}")
+
 
     # -------------------- NATIONAL GAS --------------------
     def _fetch_gas_quality(self, url: str) -> pd.DataFrame:

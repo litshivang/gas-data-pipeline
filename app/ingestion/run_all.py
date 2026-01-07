@@ -34,6 +34,8 @@ def ingest_dataset(dataset_id: str, lookback_days: int = 30):
         return
 
     # 🔄 TRANSFORM + LOAD
+    total_inserted = 0
+
     for _, series_id in series_map.items():
 
         if dataset_id == "GAS_QUALITY":
@@ -51,5 +53,9 @@ def ingest_dataset(dataset_id: str, lookback_days: int = 30):
             continue
 
         upsert_observations(records)
+        total_inserted += len(records)
 
-    logger.info(f"Completed ingestion for dataset={dataset_id}")
+    logger.info(
+        f"Completed ingestion for dataset={dataset_id}. "
+        f"Total observations upserted={total_inserted}"
+    )

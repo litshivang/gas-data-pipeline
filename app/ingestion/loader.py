@@ -24,4 +24,4 @@ def upsert_observations(records: list[dict]) -> None:
     with engine.begin() as conn:
         conn.execute(stmt)
 
-    logger.info(f"Upserted {len(records)} observations.")
+    # logger.info(f"Upserted {len(records)} observations.")

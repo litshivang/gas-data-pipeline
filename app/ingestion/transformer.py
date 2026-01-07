@@ -18,12 +18,10 @@ UTC = pytz.UTC
 def transform_gas_quality_rest(df: pd.DataFrame, series_id: str):
     records = []
 
-    # series_id format: NG_GAS_QUALITY_<SITEID>_<METRIC>
     parts = series_id.split("_")
     site_id = int(parts[-2])
     metric = parts[-1].lower()
 
-    # Support both naming styles
     col1 = f"siteGasQualityDetail_{metric}"
     col2 = f"siteGasQualityDetail.{metric}"
 
@@ -34,16 +32,17 @@ def transform_gas_quality_rest(df: pd.DataFrame, series_id: str):
     else:
         return []
 
+    # Use a single stable timestamp for the snapshot
+    snapshot_time = pd.Timestamp.utcnow().floor("s")
+
     for _, row in df[df["siteId"] == site_id].iterrows():
         value = row.get(value_col)
-
         if pd.isna(value):
             continue
 
         records.append({
             "series_id": series_id,
-            # 🔥 National Gas "latestdata" has no timestamp → use ingestion time
-            "observation_time": pd.Timestamp.utcnow(),
+            "observation_time": snapshot_time,
             "value": float(value),
             "quality_flag": None,
             "raw_payload": clean_json_payload(row.to_dict()),
