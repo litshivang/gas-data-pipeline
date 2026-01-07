@@ -1,81 +1,97 @@
 import pandas as pd
-from datetime import datetime, timedelta
+from datetime import datetime
 import pytz
-import pandas as pd
-import math
-
-UTC = pytz.UTC
-LONDON = pytz.timezone("Europe/London")
-
-
-def gas_day_to_utc(gas_day: pd.Timestamp) -> datetime:
-    """
-    Gas Day starts at 06:00 UK local time.
-    We store the canonical start of Gas Day in UTC.
-    """
-    local_dt = LONDON.localize(
-        datetime.combine(gas_day.date(), datetime.min.time())
-        + timedelta(hours=6)
-    )
-    return local_dt.astimezone(UTC).replace(minute=0, second=0, microsecond=0)
-
-
-def clean_value(v):
-    if pd.isna(v):
-        return None
-    return v
 
 
 def clean_json_payload(row: dict) -> dict:
-    return {k: clean_value(v) for k, v in row.items()}
+    """Convert NaN/NaT to None so PostgreSQL JSONB accepts it."""
+    return {k: (None if pd.isna(v) else v) for k, v in row.items()}
 
 
-def transform_ng_csv(df, series_id):
+
+UTC = pytz.UTC
+
+
+# -----------------------------
+# GAS QUALITY (NATIONAL GAS)
+# -----------------------------
+def transform_gas_quality_rest(df: pd.DataFrame, series_id: str):
     records = []
 
-    for _, row in df.iterrows():
-        # 🔥 Skip rows without numeric value
-        if pd.isna(row["Value"]):
-            continue
+    # series_id format: NG_GAS_QUALITY_<SITEID>_<METRIC>
+    parts = series_id.split("_")
+    site_id = int(parts[-2])
+    metric = parts[-1].lower()
 
-        raw = clean_json_payload(row.to_dict())
+    # Support both naming styles
+    col1 = f"siteGasQualityDetail_{metric}"
+    col2 = f"siteGasQualityDetail.{metric}"
+
+    if col1 in df.columns:
+        value_col = col1
+    elif col2 in df.columns:
+        value_col = col2
+    else:
+        return []
+
+    for _, row in df[df["siteId"] == site_id].iterrows():
+        value = row.get(value_col)
+
+        if pd.isna(value):
+            continue
 
         records.append({
             "series_id": series_id,
-            "observation_time": pd.to_datetime(
-                row["Applicable For"], dayfirst=True
-            ),
-            "value": float(row["Value"]),
-            "quality_flag": (
-                None if pd.isna(row.get("Quality Indicator"))
-                else str(row.get("Quality Indicator"))
-            ),
-            "raw_payload": raw,
+            # 🔥 National Gas "latestdata" has no timestamp → use ingestion time
+            "observation_time": pd.Timestamp.utcnow(),
+            "value": float(value),
+            "quality_flag": None,
+            "raw_payload": clean_json_payload(row.to_dict()),
         })
 
     return records
 
 
-def transform_demand_csv(df: pd.DataFrame, series_id: str) -> list[dict]:
-    REQUIRED_COLS = {"Applicable For", "Value"}
-    missing = REQUIRED_COLS - set(df.columns)
-
-    if missing:
-        raise ValueError(f"Missing expected columns: {missing}")
-
+# -----------------------------
+# ENTSOG
+# -----------------------------
+def transform_entsog_rest(df: pd.DataFrame, series_id: str):
     records = []
 
-    for _, row in df.iterrows():
-        gas_day = pd.to_datetime(row["Applicable For"], dayfirst=True)
-        value = float(row["Value"])
+    parts = series_id.split("_")
 
-        records.append(
-            {
-                "series_id": series_id,
-                "observation_time": gas_day_to_utc(gas_day),
-                "value": value,
-                "quality_flag": "ACTUAL",
-            }
-        )
+    if len(parts) < 5:
+        return []
+
+    _, _, *rest = parts
+    direction = rest[-1].lower()
+    point = rest[-2]
+    indicator = " ".join(rest[:-2]).replace("_", " ").lower()
+
+    df_norm = df.copy()
+    df_norm["indicator_norm"] = df_norm["indicator"].astype(str).str.lower().str.strip()
+    df_norm["pointKey_norm"] = df_norm["pointKey"].astype(str).str.strip()
+    df_norm["directionKey_norm"] = df_norm["directionKey"].astype(str).str.lower().str.strip()
+
+    filtered = df_norm[
+        (df_norm["indicator_norm"] == indicator) &
+        (df_norm["pointKey_norm"] == point) &
+        (df_norm["directionKey_norm"] == direction)
+    ]
+
+    for _, row in filtered.iterrows():
+        value = row.get("value")
+        if pd.isna(value):
+            continue
+
+        ts = row.get("periodFrom")
+
+        records.append({
+            "series_id": series_id,
+            "observation_time": pd.to_datetime(ts, utc=True),
+            "value": float(value),
+            "quality_flag": row.get("flowStatus"),
+            "raw_payload": clean_json_payload(row.to_dict()),  # 🔥 FIX
+        })
 
     return records

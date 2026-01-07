@@ -1,34 +1,52 @@
 import requests
 import pandas as pd
-from io import StringIO
-from datetime import date, timedelta
 from app.utils.logger import logger
 
-
-BASE_URL = "https://data.nationalgas.com/api/find-gas-data-download"
+DATASET_ENDPOINTS = {
+    "GAS_QUALITY": "https://api.nationalgas.com/operationaldata/v1/gasquality/latestdata",
+    "ENTSOG": "https://transparency.entsog.eu/api/v1/operationaldatas"
+}
 
 
 class NationalGasClient:
     def fetch_last_days(self, dataset_id: str, last_days: int) -> pd.DataFrame:
-        end_date = date.today()
-        start_date = end_date - timedelta(days=last_days)
+        if dataset_id not in DATASET_ENDPOINTS:
+            raise ValueError(f"Unknown dataset_id: {dataset_id}")
 
+        url = DATASET_ENDPOINTS[dataset_id]
+        logger.info(f"Fetching dataset={dataset_id} via {url}")
+
+        if dataset_id == "GAS_QUALITY":
+            return self._fetch_gas_quality(url)
+
+        if dataset_id == "ENTSOG":
+            return self._fetch_entsog(url, last_days)
+
+        raise ValueError(f"No handler for dataset_id={dataset_id}")
+
+    # -------------------- NATIONAL GAS --------------------
+    def _fetch_gas_quality(self, url: str) -> pd.DataFrame:
+        response = requests.get(url, timeout=30)
+        response.raise_for_status()
+        data = response.json()
+
+        if "gasQualityData" not in data:
+            raise ValueError(f"Invalid GAS_QUALITY response keys: {data.keys()}")
+
+        return pd.json_normalize(data["gasQualityData"])
+
+    # -------------------- ENTSOG --------------------
+    def _fetch_entsog(self, url: str, last_days: int) -> pd.DataFrame:
         params = {
-            "applicableFor": "Y",
-            "dateFrom": start_date.isoformat(),
-            "dateTo": end_date.isoformat(),
-            "dateType": "GASDAY",
-            "latestFlag": "Y",
-            "ids": dataset_id,
-            "type": "CSV",
+            "periodType": "day",
+            "limit": 100
         }
 
-        logger.info(
-            f"Fetching National Gas data: {dataset_id} "
-            f"({start_date} → {end_date})"
-        )
-
-        response = requests.get(BASE_URL, params=params, timeout=30)
+        response = requests.get(url, params=params, timeout=30)
         response.raise_for_status()
+        data = response.json()
 
-        return pd.read_csv(StringIO(response.text))
+        if "operationaldatas" not in data:
+            raise ValueError(f"Invalid ENTSOG response keys: {data.keys()}")
+
+        return pd.json_normalize(data["operationaldatas"])
