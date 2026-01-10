@@ -1,19 +1,15 @@
 import pandas as pd
-from datetime import datetime
 import pytz
-
-
-def clean_json_payload(row: dict) -> dict:
-    """Convert NaN/NaT to None so PostgreSQL JSONB accepts it."""
-    return {k: (None if pd.isna(v) else v) for k, v in row.items()}
-
-
 
 UTC = pytz.UTC
 
 
+def clean_json_payload(row: dict) -> dict:
+    return {k: (None if pd.isna(v) else v) for k, v in row.items()}
+
+
 # -----------------------------
-# GAS QUALITY (NATIONAL GAS)
+# GAS QUALITY (REST)
 # -----------------------------
 def transform_gas_quality_rest(df: pd.DataFrame, series_id: str):
     records = []
@@ -22,27 +18,19 @@ def transform_gas_quality_rest(df: pd.DataFrame, series_id: str):
     site_id = int(parts[-2])
     metric = parts[-1].lower()
 
-    col1 = f"siteGasQualityDetail_{metric}"
-    col2 = f"siteGasQualityDetail.{metric}"
-
-    if col1 in df.columns:
-        value_col = col1
-    elif col2 in df.columns:
-        value_col = col2
-    else:
+    if metric not in df.columns:
         return []
 
-    # Use a single stable timestamp for the snapshot
-    snapshot_time = pd.Timestamp.utcnow().floor("s")
-
     for _, row in df[df["siteId"] == site_id].iterrows():
-        value = row.get(value_col)
+        value = row.get(metric)
         if pd.isna(value):
             continue
 
+        ts = row.get("publishedTime")
+
         records.append({
             "series_id": series_id,
-            "observation_time": snapshot_time,
+            "observation_time": pd.to_datetime(ts, utc=True),
             "value": float(value),
             "quality_flag": None,
             "raw_payload": clean_json_payload(row.to_dict()),
@@ -51,14 +39,14 @@ def transform_gas_quality_rest(df: pd.DataFrame, series_id: str):
     return records
 
 
+
 # -----------------------------
 # ENTSOG
 # -----------------------------
-def transform_entsog_rest(df: pd.DataFrame, series_id: str):
+def transform_entsog_rest(df: pd.DataFrame, series_id: str, from_date=None, to_date=None):
     records = []
 
     parts = series_id.split("_")
-
     if len(parts) < 5:
         return []
 
@@ -78,9 +66,23 @@ def transform_entsog_rest(df: pd.DataFrame, series_id: str):
         (df_norm["directionKey_norm"] == direction)
     ]
 
+    # 🔥 DATE FILTER
+    filtered["periodFrom_dt"] = pd.to_datetime(filtered["periodFrom"], errors="coerce")
+
+    if from_date:
+        filtered = filtered[filtered["periodFrom_dt"] >= pd.to_datetime(from_date)]
+    if to_date:
+        filtered = filtered[filtered["periodFrom_dt"] <= pd.to_datetime(to_date)]
+
     for _, row in filtered.iterrows():
         value = row.get("value")
-        if pd.isna(value):
+
+        if value in (None, "", " "):
+            continue
+
+        try:
+            value = float(value)
+        except ValueError:
             continue
 
         ts = row.get("periodFrom")
@@ -88,9 +90,9 @@ def transform_entsog_rest(df: pd.DataFrame, series_id: str):
         records.append({
             "series_id": series_id,
             "observation_time": pd.to_datetime(ts, utc=True),
-            "value": float(value),
+            "value": value,
             "quality_flag": row.get("flowStatus"),
-            "raw_payload": clean_json_payload(row.to_dict()),  # 🔥 FIX
+            "raw_payload": clean_json_payload(row.to_dict()),
         })
 
     return records

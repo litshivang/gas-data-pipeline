@@ -1,7 +1,6 @@
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from collections import defaultdict
-
 from app.db.connection import get_db_session
 from app.api.v2.schemas import SeriesResponse, DataPoint
 from app.api.v2.queries import DATA_QUERY
@@ -15,6 +14,9 @@ def get_data(
     dataset_id: str | None = None,
     start: str | None = None,
     end: str | None = None,
+    quality_flag: str | None = None,
+    min_value: float | None = None,
+    max_value: float | None = None,
     limit: int = Query(1000, le=5000),
     offset: int = 0,
     include_raw: bool = False,
@@ -27,14 +29,15 @@ def get_data(
             "dataset_id": dataset_id,
             "start": start,
             "end": end,
+            "quality_flag": quality_flag,
+            "min_value": min_value,
+            "max_value": max_value,
             "limit": limit,
             "offset": offset,
         },
     ).fetchall()
 
-    grouped = defaultdict(lambda: {
-        "points": []
-    })
+    grouped = defaultdict(lambda: {"points": []})
 
     for r in rows:
         key = r.series_id

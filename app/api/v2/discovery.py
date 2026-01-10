@@ -53,3 +53,35 @@ def sample_data(dataset_id: str, limit: int = Query(5, le=50)):
         ).fetchall()
 
     return [r[0] for r in rows]
+
+
+
+@router.get("/raw")
+def raw_preview(
+    dataset_id: str,
+    limit: int = Query(20, ge=1, le=500),
+    site_id: int | None = None,
+):
+    """
+    Return raw payload with optional filters (still zero-loss).
+    Filters apply to JSON keys using PostgreSQL JSONB operators.
+    """
+    where = ["dataset_id = :dataset_id"]
+    params = {"dataset_id": dataset_id, "limit": limit}
+
+    if site_id is not None:
+        where.append("(raw_payload ->> 'siteId')::int = :site_id")
+        params["site_id"] = site_id
+
+    sql = f"""
+        SELECT raw_payload
+        FROM raw_events
+        WHERE {' AND '.join(where)}
+        ORDER BY ingested_at DESC
+        LIMIT :limit
+    """
+
+    with engine.connect() as conn:
+        rows = conn.execute(text(sql), params).fetchall()
+
+    return [r[0] for r in rows]

@@ -1,6 +1,5 @@
 from sqlalchemy import text
 from app.db.connection import engine
-from datetime import datetime
 
 
 def infer_type(value):
@@ -12,6 +11,8 @@ def infer_type(value):
         return "integer"
     if isinstance(value, float):
         return "float"
+    if isinstance(value, (list, dict)):
+        return "json"
     return "string"
 
 

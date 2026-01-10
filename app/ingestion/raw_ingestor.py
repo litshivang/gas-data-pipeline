@@ -5,6 +5,21 @@ from datetime import datetime
 import pandas as pd
 
 
+def sanitize_value(v):
+    # Preserve complex JSON structures (zero-loss)
+    if isinstance(v, (list, dict)):
+        return v
+
+    # Safely handle NaN / NaT
+    try:
+        if pd.isna(v):
+            return None
+    except Exception:
+        pass
+
+    return v
+
+
 def ingest_raw_df(
     df: pd.DataFrame,
     dataset_id: str,
@@ -15,11 +30,8 @@ def ingest_raw_df(
     for _, row in df.iterrows():
         payload = row.to_dict()
 
-        # sanitize NaN → None (CRITICAL)
-        payload = {
-            k: (None if pd.isna(v) else v)
-            for k, v in payload.items()
-        }
+        # 🔥 FIX: JSON-safe sanitization
+        payload = {k: sanitize_value(v) for k, v in payload.items()}
 
         records.append({
             "source": source,
