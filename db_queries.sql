@@ -4,7 +4,7 @@
 
 CREATE DATABASE gas_data;
 
-CREATE USER gas_user WITH PASSWORD 'YOUR_PASSWORD_HERE';
+CREATE USER gas_user WITH PASSWORD 'gas_password';
 
 GRANT ALL PRIVILEGES ON DATABASE gas_data TO gas_user;
 
@@ -138,3 +138,8 @@ GRANT ALL ON TABLES TO gas_user;
 
 ALTER DEFAULT PRIVILEGES IN SCHEMA public
 GRANT ALL ON SEQUENCES TO gas_user;
+
+
+UPDATE meta_series
+SET last_ingested_at = NOW()
+WHERE series_id = :series_id;
