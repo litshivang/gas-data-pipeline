@@ -1,25 +1,31 @@
-from apscheduler.schedulers.blocking import BlockingScheduler
+from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
-from app.ingestion.run_all import run_national_gas
+from app.scheduler.jobs import hourly_ingest, daily_ingest
 from app.utils.logger import logger
 
+scheduler = BackgroundScheduler()
 
-def start_scheduler():
-    scheduler = BlockingScheduler(timezone="UTC")
 
-    scheduler.add_job(
-        func=run_national_gas,
-        trigger=IntervalTrigger(hours=1),
-        id="national_gas_ingestion",
-        name="Hourly National Gas Ingestion",
-        replace_existing=True,
-        max_instances=1,
-        coalesce=True,
-    )
+def start_scheduler(run_hourly: bool = True, run_daily: bool = True):
+    logger.info("🚀 Starting ingestion scheduler")
 
-    logger.info("Scheduler started: National Gas ingestion every hour")
+    if run_hourly:
+        scheduler.add_job(
+            hourly_ingest,
+            trigger=IntervalTrigger(hours=1),
+            id="hourly_ingest",
+            replace_existing=True,
+        )
+        logger.info("⏰ Hourly ingestion enabled")
 
-    try:
-        scheduler.start()
-    except (KeyboardInterrupt, SystemExit):
-        logger.info("Scheduler stopped gracefully")
+    if run_daily:
+        scheduler.add_job(
+            daily_ingest,
+            trigger=CronTrigger(hour=0, minute=0),
+            id="daily_ingest",
+            replace_existing=True,
+        )
+        logger.info("🌙 Daily ingestion enabled (12:00 AM UTC)")
+
+    scheduler.start()
