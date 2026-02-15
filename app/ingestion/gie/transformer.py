@@ -9,10 +9,42 @@ def transform(dataset: str, raw_json: dict):
         country = entry.get("name")
         gas_day = entry.get("gasDayStart")
 
+        if not gas_day:
+            continue
+
+        parsed_date = datetime.strptime(gas_day, "%Y-%m-%d").date()
+
         for key, value in entry.items():
+
             if key in EXCLUDED_KEYS:
                 continue
 
+            # -----------------------------
+            # 🔥 Handle nested dicts (ALSI)
+            # -----------------------------
+            if isinstance(value, dict):
+                for sub_k, sub_v in value.items():
+
+                    if sub_v in NULL_LIKE_VALUES:
+                        numeric_value = None
+                    else:
+                        try:
+                            numeric_value = float(sub_v)
+                        except (ValueError, TypeError):
+                            continue
+
+                    rows.append({
+                        "country": country,
+                        "date": parsed_date,
+                        "variable": f"{key}_{sub_k}",
+                        "value": numeric_value,
+                        "quality": entry.get("status"),
+                    })
+                continue
+
+            # -----------------------------
+            # Standard numeric (AGSI)
+            # -----------------------------
             if value in NULL_LIKE_VALUES:
                 numeric_value = None
             else:
@@ -23,7 +55,7 @@ def transform(dataset: str, raw_json: dict):
 
             rows.append({
                 "country": country,
-                "date": datetime.strptime(gas_day, "%Y-%m-%d").date(),
+                "date": parsed_date,
                 "variable": key,
                 "value": numeric_value,
                 "quality": entry.get("status"),
