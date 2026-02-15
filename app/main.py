@@ -4,6 +4,7 @@ from app.api.v2.routes import router as v2_router
 from app.api.v2.discovery import router as discovery_router
 from app.api.v2.ingestion import router as ingestion_router
 from app.api.v2.export import router as export_router
+from app.api.v2.gie import router as gie_router
 
 
 app = FastAPI(
@@ -17,4 +18,5 @@ app.include_router(v2_router)
 app.include_router(discovery_router)
 app.include_router(ingestion_router)
 app.include_router(export_router)
+app.include_router(gie_router)
 

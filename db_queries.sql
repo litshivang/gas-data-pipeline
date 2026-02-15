@@ -143,3 +143,44 @@ GRANT ALL ON SEQUENCES TO gas_user;
 UPDATE meta_series
 SET last_ingested_at = NOW()
 WHERE series_id = :series_id;
+
+
+-- GIE API:
+
+CREATE SCHEMA meta;
+CREATE SCHEMA energy;
+
+CREATE TABLE meta.assets (
+    asset_id SERIAL PRIMARY KEY,
+    name TEXT NOT NULL,
+    type TEXT,
+    subtype TEXT,
+    direction TEXT,
+    level TEXT,
+    quality TEXT
+);
+
+
+CREATE TABLE meta.series (
+    series_id SERIAL PRIMARY KEY,
+    series_name TEXT,
+    asset_id INTEGER NOT NULL REFERENCES meta.assets(asset_id),
+    series_unique_concat TEXT UNIQUE,
+    variable TEXT,
+    status TEXT,
+    status_blend TEXT,
+    source TEXT,
+    source_blend TEXT,
+    do_filter BOOLEAN,
+    do_estimate BOOLEAN NOT NULL DEFAULT FALSE,
+    exclude_noms BOOLEAN NOT NULL DEFAULT FALSE
+);
+
+
+CREATE TABLE energy.daily (
+    value_date DATE NOT NULL,
+    value NUMERIC NOT NULL,
+    series_id INTEGER NOT NULL REFERENCES meta.series(series_id),
+    asset_id INTEGER NOT NULL REFERENCES meta.assets(asset_id),
+    PRIMARY KEY (value_date, series_id)
+);

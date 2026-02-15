@@ -13,6 +13,9 @@ class Settings:
     DB_PASSWORD = os.getenv("POSTGRES_PASSWORD")
 
     LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
+    
+    GIE_API_KEY = os.getenv("GIE_API_KEY")  
+
 
     @property
     def database_url(self) -> str:
