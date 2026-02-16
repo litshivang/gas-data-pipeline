@@ -140,11 +140,6 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public
 GRANT ALL ON SEQUENCES TO gas_user;
 
 
-UPDATE meta_series
-SET last_ingested_at = NOW()
-WHERE series_id = :series_id;
-
-
 -- GIE API:
 
 CREATE SCHEMA meta;
@@ -184,3 +179,35 @@ CREATE TABLE energy.daily (
     asset_id INTEGER NOT NULL REFERENCES meta.assets(asset_id),
     PRIMARY KEY (value_date, series_id)
 );
+
+
+-- GIVE ACCESS:
+
+
+-- Give schema access
+GRANT USAGE ON SCHEMA meta TO gas_user;
+GRANT USAGE ON SCHEMA energy TO gas_user;
+
+-- Give table privileges
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA meta TO gas_user;
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA energy TO gas_user;
+
+-- Future tables auto-permission
+ALTER DEFAULT PRIVILEGES IN SCHEMA meta
+GRANT ALL ON TABLES TO gas_user;
+
+ALTER DEFAULT PRIVILEGES IN SCHEMA energy
+GRANT ALL ON TABLES TO gas_user;
+
+-- Give usage on all sequences in meta
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA meta TO gas_user;
+
+-- Give usage on all sequences in energy (future safe)
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA energy TO gas_user;
+
+-- Future sequences auto-grant
+ALTER DEFAULT PRIVILEGES IN SCHEMA meta
+GRANT USAGE, SELECT ON SEQUENCES TO gas_user;
+
+ALTER DEFAULT PRIVILEGES IN SCHEMA energy
+GRANT USAGE, SELECT ON SEQUENCES TO gas_user;
