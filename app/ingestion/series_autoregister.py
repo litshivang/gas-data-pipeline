@@ -99,4 +99,35 @@ def register_series_from_df(df, dataset_id: str):
 
         return series_map
 
+
+    # ================= INSTANTANEOUS FLOW =================
+    if dataset_id == "INSTANTANEOUS_FLOW" and "siteName" in df.columns:
+
+        series_map = {}
+
+        for site in df["siteName"].dropna().unique():
+
+            series_id = make_series_id(dataset_id, site, "FLOWRATE")
+            series_map[(site, "flowRate")] = series_id
+
+            record = {
+                "series_id": series_id,
+                "source": "NATIONAL_GAS",
+                "dataset_id": dataset_id,
+                "data_item": "flowRate",
+                "description": f"Instantaneous Flow at {site}",
+                "unit": "UNKNOWN",
+                "frequency": "intraday",
+                "timezone_source": "Europe/London",
+                "is_active": True,
+            }
+
+            stmt = insert(MetaSeries).values(record)
+            stmt = stmt.on_conflict_do_nothing(index_elements=["series_id"])
+
+            with engine.begin() as conn:
+                conn.execute(stmt)
+
+        return series_map
+
     return {}

@@ -3,6 +3,7 @@ from app.ingestion.series_autoregister import register_series_from_df
 from app.ingestion.transformer import (
     transform_gas_quality_rest,
     transform_entsog_rest,
+    transform_instantaneous_flow,
 )
 from app.ingestion.loader import upsert_observations
 from app.utils.logger import logger
@@ -48,6 +49,13 @@ def ingest_dataset(
             indicators=indicators,
             limit=limit,
         )
+    
+    # ---------------- INSTANTANEOUS FLOW ----------------        
+    elif dataset_id == "INSTANTANEOUS_FLOW":
+        df = client.fetch_instantaneous_flow(
+            from_date=from_date,
+            to_date=to_date,
+        )
 
     else:
         raise ValueError(f"Unsupported dataset_id for API ingestion: {dataset_id}")
@@ -81,7 +89,9 @@ def ingest_dataset(
                 from_date=from_date,
                 to_date=to_date,
             )
-
+            
+        elif dataset_id == "INSTANTANEOUS_FLOW":
+            records = transform_instantaneous_flow(df, series_id)            
 
         else:
             logger.warning(f"No transformer for dataset={dataset_id}")

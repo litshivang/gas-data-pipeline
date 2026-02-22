@@ -81,3 +81,17 @@ def ingest_entsog(
             "indicators": indicators,
         }
     }
+
+
+@router.post("/instantaneous")
+def ingest_instantaneous_flow(background_tasks: BackgroundTasks):
+
+    background_tasks.add_task(
+        ingest_dataset,
+        dataset_id="INSTANTANEOUS_FLOW"
+    )
+
+    return {
+        "status": "accepted",
+        "dataset": "INSTANTANEOUS_FLOW"
+    }

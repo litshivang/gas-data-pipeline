@@ -10,7 +10,8 @@ from urllib3.util.retry import Retry
 DATASET_ENDPOINTS = {
     "GAS_QUALITY_LATEST": "https://api.nationalgas.com/operationaldata/v1/gasquality/latestdata",
     "GAS_QUALITY_HISTORIC": "https://api.nationalgas.com/operationaldata/v1/gasquality/historicdata",
-    "ENTSOG": "https://transparency.entsog.eu/api/v1/operationaldatas"
+    "ENTSOG": "https://transparency.entsog.eu/api/v1/operationaldatas",
+    "INSTANTANEOUS_FLOW": "https://api.nationalgas.com/operationaldata/v1/instantaneousflow/sites"
 }
 
 
@@ -183,3 +184,36 @@ class NationalGasClient:
             return pd.DataFrame()
 
         return pd.json_normalize(records)
+    
+    
+    # -------------------- Instantaneous --------------------
+    def fetch_instantaneous_flow(
+        self,
+        from_date: str | None = None,
+        to_date: str | None = None,
+        site_names: list[str] | None = None,
+    ) -> pd.DataFrame:
+
+        url = DATASET_ENDPOINTS["INSTANTANEOUS_FLOW"]
+
+        session = self._build_session()
+        response = session.get(url, timeout=60)
+        response.raise_for_status()
+        data = response.json()
+
+        rows = []
+
+        for block in data.get("instantaneousFlow", []):
+            for site in block.get("sites", []):
+                site_name = site.get("siteName")
+
+                for detail in site.get("siteGasDetail", []):
+                    rows.append({
+                        "siteName": site_name,
+                        "applicableAt": detail.get("applicableAt"),
+                        "flowRate": detail.get("flowRate"),
+                        "qualityIndicator": detail.get("qualityIndicator"),
+                        "scheduleTime": detail.get("scheduleTime"),
+                    })
+
+        return pd.DataFrame(rows)

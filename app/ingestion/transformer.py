@@ -96,3 +96,36 @@ def transform_entsog_rest(df: pd.DataFrame, series_id: str, from_date=None, to_d
         })
 
     return records
+
+
+# -----------------------------
+# INSTANTANEOUS FLOW
+# -----------------------------
+
+def transform_instantaneous_flow(df: pd.DataFrame, series_id: str):
+    records = []
+
+    # Remove prefix
+    prefix = "NG_INSTANTANEOUS_FLOW_"
+    if not series_id.startswith(prefix):
+        return []
+
+    # Remove prefix and suffix
+    site = series_id[len(prefix):].rsplit("_FLOWRATE", 1)[0]
+
+    filtered = df[df["siteName"].str.upper().str.replace(" ", "_") == site]
+
+    for _, row in filtered.iterrows():
+        value = row.get("flowRate")
+        if value is None:
+            continue
+
+        records.append({
+            "series_id": series_id,
+            "observation_time": pd.to_datetime(row["applicableAt"], utc=True),
+            "value": float(value),
+            "quality_flag": row.get("qualityIndicator"),
+            "raw_payload": clean_json_payload(row.to_dict()),
+        })
+
+    return records
