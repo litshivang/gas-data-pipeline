@@ -11,7 +11,10 @@ DATASET_ENDPOINTS = {
     "GAS_QUALITY_LATEST": "https://api.nationalgas.com/operationaldata/v1/gasquality/latestdata",
     "GAS_QUALITY_HISTORIC": "https://api.nationalgas.com/operationaldata/v1/gasquality/historicdata",
     "ENTSOG": "https://transparency.entsog.eu/api/v1/operationaldatas",
-    "INSTANTANEOUS_FLOW": "https://api.nationalgas.com/operationaldata/v1/instantaneousflow/sites"
+    "INSTANTANEOUS_FLOW": "https://api.nationalgas.com/operationaldata/v1/instantaneousflow/sites",
+    "GAS_PUBLICATIONS": "https://api.nationalgas.com/operationaldata/v1/publications/gasday",    
+    "PUBLICATION_CATALOGUE": "https://api.nationalgas.com/operationaldata/v1/publications/catalogue"
+
 }
 
 
@@ -215,5 +218,45 @@ class NationalGasClient:
                         "qualityIndicator": detail.get("qualityIndicator"),
                         "scheduleTime": detail.get("scheduleTime"),
                     })
+
+        return pd.DataFrame(rows)
+
+    # -------------------- GAS PUBLICATION --------------------
+    def fetch_publication_catalogue(self):
+        url = DATASET_ENDPOINTS["PUBLICATION_CATALOGUE"]
+        response = requests.get(url, timeout=60)
+        response.raise_for_status()
+        return response.json()
+
+
+    def fetch_gas_publications(self, from_date: str, to_date: str, publication_ids: list[str]):
+        url = DATASET_ENDPOINTS["GAS_PUBLICATIONS"]
+
+        payload = {
+            "fromDate": from_date,
+            "toDate": to_date,
+            "publicationIds": publication_ids,
+            "latestValue": "Y"
+        }
+
+        response = requests.post(url, json=payload, timeout=60)
+        response.raise_for_status()
+        data = response.json()
+
+        rows = []
+
+        for pub in data:
+            pub_id = pub.get("publicationId")
+            pub_name = pub.get("publicationName")
+
+            for entry in pub.get("publications", []):
+                rows.append({
+                    "publicationId": pub_id,
+                    "publicationName": pub_name,
+                    "applicableFor": entry.get("applicableFor"),
+                    "value": entry.get("value"),
+                    "qualityIndicator": entry.get("qualityIndicator"),
+                    "generatedTimeStamp": entry.get("generatedTimeStamp"),
+                })
 
         return pd.DataFrame(rows)

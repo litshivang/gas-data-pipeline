@@ -17,3 +17,9 @@ class SeriesResponse(BaseModel):
     unit: str
     frequency: str
     points: List[DataPoint]
+
+
+class GasPublicationRequest(BaseModel):
+    from_date: str
+    to_date: str
+    publication_ids: List[str]

@@ -4,6 +4,7 @@ from app.ingestion.transformer import (
     transform_gas_quality_rest,
     transform_entsog_rest,
     transform_instantaneous_flow,
+    transform_gas_publications,
 )
 from app.ingestion.loader import upsert_observations
 from app.utils.logger import logger
@@ -21,6 +22,7 @@ def ingest_dataset(
     direction_keys: list[str] | None = None,
     indicators: list[str] | None = None,
     limit: int | None = None,
+    publication_ids: list[str] | None = None,
 ):
     logger.info(
         f"Ingesting dataset={dataset_id}, from={from_date}, to={to_date}, "
@@ -56,6 +58,15 @@ def ingest_dataset(
             from_date=from_date,
             to_date=to_date,
         )
+        
+    # ---------------- GAS PUBLICATIONS ----------------
+    elif dataset_id == "GAS_PUBLICATIONS":
+            df = client.fetch_gas_publications(
+                from_date=from_date,
+                to_date=to_date,
+                publication_ids=publication_ids
+            )
+
 
     else:
         raise ValueError(f"Unsupported dataset_id for API ingestion: {dataset_id}")
@@ -92,6 +103,9 @@ def ingest_dataset(
             
         elif dataset_id == "INSTANTANEOUS_FLOW":
             records = transform_instantaneous_flow(df, series_id)            
+
+        elif dataset_id == "GAS_PUBLICATIONS":
+            records = transform_gas_publications(df, series_id)
 
         else:
             logger.warning(f"No transformer for dataset={dataset_id}")

@@ -130,4 +130,35 @@ def register_series_from_df(df, dataset_id: str):
 
         return series_map
 
+    # ================= GAS_PUBLICATIONS =================
+    if dataset_id == "GAS_PUBLICATIONS" and "publicationId" in df.columns:
+
+        series_map = {}
+
+        for pub_id in df["publicationId"].dropna().unique():
+
+            series_id = make_series_id(dataset_id, pub_id)
+            series_map[(pub_id, "value")] = series_id
+
+            record = {
+                "series_id": series_id,
+                "source": "NATIONAL_GAS",
+                "dataset_id": dataset_id,
+                "data_item": pub_id,
+                "description": f"Publication {pub_id}",
+                "unit": "UNKNOWN",
+                "frequency": "daily",
+                "timezone_source": "UTC",
+                "is_active": True,
+            }
+
+            stmt = insert(MetaSeries).values(record)
+            stmt = stmt.on_conflict_do_nothing(index_elements=["series_id"])
+
+            with engine.begin() as conn:
+                conn.execute(stmt)
+
+        return series_map
+
+
     return {}

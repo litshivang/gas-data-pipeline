@@ -129,3 +129,35 @@ def transform_instantaneous_flow(df: pd.DataFrame, series_id: str):
         })
 
     return records
+
+# -----------------------------
+# GAS PUBLICATIONS
+# -----------------------------
+
+def transform_gas_publications(df: pd.DataFrame, series_id: str):
+    records = []
+
+    pub_id = series_id.split("_")[-1]
+
+    filtered = df[df["publicationId"] == pub_id]
+
+    for _, row in filtered.iterrows():
+
+        value = row.get("value")
+        if value in (None, "", " "):
+            continue
+
+        try:
+            numeric_value = float(value)
+        except ValueError:
+            continue
+
+        records.append({
+            "series_id": series_id,
+            "observation_time": pd.to_datetime(row["applicableFor"], utc=True),
+            "value": numeric_value,
+            "quality_flag": row.get("qualityIndicator"),
+            "raw_payload": clean_json_payload(row.to_dict()),
+        })
+
+    return records
