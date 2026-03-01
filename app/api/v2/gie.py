@@ -1,21 +1,22 @@
-from fastapi import APIRouter
-from app.ingestion.gie.service import ingest_gie
-from app.ingestion.gie.constants import DATASET_AGSI, DATASET_ALSI, SOURCE_AGSI, SOURCE_ALSI
 from fastapi import APIRouter, Query
 from sqlalchemy import text
 from app.db.connection import engine
+from app.ingestion.core import registry, Orchestrator
+import app.ingestion.adapters  # noqa: F401 — register adapters
 
 router = APIRouter(prefix="/v2/gie", tags=["GIE"])
+_orchestrator = Orchestrator(registry)
+
 
 @router.post("/agsi")
 def ingest_agsi(country: str | None = None):
-    ingest_gie(DATASET_AGSI, SOURCE_AGSI, country)
+    _orchestrator.run("AGSI", country=country)
     return {"status": "completed", "dataset": "AGSI", "country": country}
 
 
 @router.post("/alsi")
 def ingest_alsi(country: str | None = None):
-    ingest_gie(DATASET_ALSI, SOURCE_ALSI, country)
+    _orchestrator.run("ALSI", country=country)
     return {"status": "completed", "dataset": "ALSI", "country": country}
 
 @router.get("/data")

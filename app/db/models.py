@@ -56,6 +56,7 @@ class DataObservation(Base):
     )
 
     ingestion_time = Column(DateTime, default=datetime.utcnow)
+    ingestion_run_id = Column(UUID(as_uuid=True), nullable=True)
     value = Column(Float, nullable=False)
     quality_flag = Column(String, default="UNKNOWN")
 
@@ -72,7 +73,23 @@ class RawEvent(Base):
     event_time = Column(DateTime)
     ingested_at = Column(DateTime, default=datetime.utcnow)
     raw_payload = Column(JSONB, nullable=False)
+    ingestion_run_id = Column(UUID(as_uuid=True), nullable=True)
 
+
+
+class IngestionRun(Base):
+    __tablename__ = "ingestion_runs"
+
+    run_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    dataset_id = Column(Text, nullable=False)
+    started_at = Column(DateTime(timezone=True), nullable=False)
+    finished_at = Column(DateTime(timezone=True))
+    status = Column(Text, nullable=False)  # RUNNING | SUCCESS | FAILED
+    rows_fetched = Column(Integer, default=0)
+    rows_inserted = Column(Integer, default=0)
+    rows_deleted = Column(Integer, default=0)
+    error_message = Column(Text)
+    created_at = Column(DateTime(timezone=True), nullable=False)
 
 
 class FieldCatalog(Base):

@@ -1,14 +1,13 @@
 from fastapi import APIRouter, Query, HTTPException, BackgroundTasks
 from app.ingestion.national_gas_client import NationalGasClient
 from app.ingestion.run_all import ingest_dataset
+from app.ingestion.core import registry, Orchestrator
+import app.ingestion.adapters  # noqa: F401 — register GAS_QUALITY adapter
 from datetime import datetime
 from typing import List, Optional
-from fastapi.responses import JSONResponse
-from app.api.v2.schemas import GasPublicationRequest
-
-
-
 router = APIRouter(prefix="/v2/ingest", tags=["Ingestion"])
+_orchestrator = Orchestrator(registry)
+
 
 @router.post("/gas")
 def ingest_gas_quality(
@@ -30,13 +29,13 @@ def ingest_gas_quality(
     if t < f:
         raise HTTPException(status_code=400, detail="to_date must be >= from_date")
 
-    # ---------------- BACKGROUND INGEST ----------------
+    # ---------------- BACKGROUND INGEST (new path: orchestrator + adapter) ----------------
     background_tasks.add_task(
-        ingest_dataset,
-        dataset_id="GAS_QUALITY",
+        _orchestrator.run,
+        "GAS_QUALITY",
         from_date=from_date,
         to_date=to_date,
-        site_ids=site_ids,   # None = all sites
+        site_ids=site_ids,
     )
 
     # ---------------- IMMEDIATE RESPONSE ----------------
@@ -62,8 +61,8 @@ def ingest_entsog(
     limit: int = Query(1000),
 ):
     background_tasks.add_task(
-        ingest_dataset,
-        dataset_id="ENTSOG",
+        _orchestrator.run,
+        "ENTSOG",
         from_date=from_date,
         to_date=to_date,
         operator_keys=operator_keys,
@@ -72,7 +71,6 @@ def ingest_entsog(
         indicators=indicators,
         limit=limit,
     )
-
     return {
         "status": "accepted",
         "dataset": "ENTSOG",
