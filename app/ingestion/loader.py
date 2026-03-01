@@ -4,16 +4,17 @@ from app.db.models import DataObservation
 from app.utils.logger import logger
 
 
-def upsert_observations(records: list[dict]) -> None:
+def upsert_observations(records: list[dict], run_id: str | None = None) -> None:
     if not records:
         logger.warning("No records to insert.")
         return
 
-    # 🔥 FIX: Deduplicate by unique constraint
     unique = {}
     for r in records:
         key = (r["series_id"], r["observation_time"])
-        unique[key] = r   # last write wins
+        unique[key] = dict(r)
+        if run_id is not None:
+            unique[key]["ingestion_run_id"] = run_id
 
     deduped_records = list(unique.values())
 
@@ -26,6 +27,7 @@ def upsert_observations(records: list[dict]) -> None:
             "ingestion_time": stmt.excluded.ingestion_time,
             "quality_flag": stmt.excluded.quality_flag,
             "raw_payload": stmt.excluded.raw_payload,
+            "ingestion_run_id": stmt.excluded.ingestion_run_id,
         },
     )
 

@@ -211,3 +211,64 @@ GRANT USAGE, SELECT ON SEQUENCES TO gas_user;
 
 ALTER DEFAULT PRIVILEGES IN SCHEMA energy
 GRANT USAGE, SELECT ON SEQUENCES TO gas_user;
+
+
+-- NEW ARCHITECTURE QUERIES:
+
+CREATE TABLE IF NOT EXISTS ingestion_runs (
+    run_id UUID PRIMARY KEY,
+    dataset_id TEXT NOT NULL,
+    started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    finished_at TIMESTAMPTZ,
+    status TEXT NOT NULL, -- RUNNING | SUCCESS | FAILED
+    rows_fetched INTEGER DEFAULT 0,
+    rows_inserted INTEGER DEFAULT 0,
+    rows_deleted INTEGER DEFAULT 0,
+    error_message TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+
+ALTER TABLE data_observations
+ADD COLUMN IF NOT EXISTS ingestion_run_id UUID;
+
+ALTER TABLE data_observations
+ADD CONSTRAINT fk_data_observations_run
+FOREIGN KEY (ingestion_run_id)
+REFERENCES ingestion_runs(run_id)
+ON DELETE SET NULL;
+
+
+CREATE INDEX IF NOT EXISTS idx_data_observations_run
+ON data_observations (ingestion_run_id);
+
+
+ALTER TABLE raw_events
+ADD COLUMN IF NOT EXISTS ingestion_run_id UUID;
+
+
+ALTER TABLE raw_events
+ADD CONSTRAINT fk_raw_events_run
+FOREIGN KEY (ingestion_run_id)
+REFERENCES ingestion_runs(run_id)
+ON DELETE SET NULL;
+
+
+CREATE INDEX IF NOT EXISTS idx_raw_events_run
+ON raw_events (ingestion_run_id);
+
+
+CREATE INDEX IF NOT EXISTS idx_data_observations_time
+ON data_observations (observation_time);
+
+CREATE INDEX IF NOT EXISTS idx_data_observations_dataset_time
+ON data_observations (series_id, observation_time);
+
+
+ALTER TABLE raw_events
+ALTER COLUMN ingested_at TYPE timestamptz
+USING ingested_at AT TIME ZONE 'UTC';
+
+ALTER TABLE raw_events
+ALTER COLUMN event_time TYPE timestamptz
+USING event_time AT TIME ZONE 'UTC';

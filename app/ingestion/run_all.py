@@ -1,15 +1,21 @@
-from app.ingestion.national_gas_client import NationalGasClient
-from app.ingestion.series_autoregister import register_series_from_df
-from app.ingestion.transformer import (
-    transform_gas_quality_rest,
-    transform_entsog_rest,
-    transform_instantaneous_flow,
-    transform_gas_publications,
-)
-from app.ingestion.loader import upsert_observations
+"""
+Single entry point for ingestion: registry-driven orchestrator only.
+No dataset conditionals. All datasets go through orchestrator + adapter.
+"""
+
+from datetime import datetime, timedelta, timezone
+
 from app.utils.logger import logger
-from app.ingestion.raw_ingestor import ingest_raw_df
-from app.ingestion.field_discovery import discover_fields
+from app.ingestion.core import registry, Orchestrator
+import app.ingestion.adapters  # noqa: F401 — register all adapters
+
+
+def run_national_gas() -> None:
+    """Scheduled job: run GAS_QUALITY for last 2 days. Used by scheduler."""
+    to_d = datetime.now(timezone.utc).date()
+    from_d = (to_d - timedelta(days=2)).isoformat()
+    to_d_str = to_d.isoformat()
+    ingest_dataset("GAS_QUALITY", from_date=from_d, to_date=to_d_str)
 
 
 def ingest_dataset(
@@ -23,98 +29,34 @@ def ingest_dataset(
     indicators: list[str] | None = None,
     limit: int | None = None,
     publication_ids: list[str] | None = None,
+    country: str | None = None,
 ):
+    """Run ingestion for dataset_id via orchestrator. No adapter → ValueError."""
     logger.info(
-        f"Ingesting dataset={dataset_id}, from={from_date}, to={to_date}, "
-        f"sites={site_ids}, operators={operator_keys}, points={point_keys}, "
-        f"directions={direction_keys}, indicators={indicators}, limit={limit}"
+        "Ingesting dataset=%s, from=%s, to=%s, sites=%s, operators=%s, points=%s, "
+        "directions=%s, indicators=%s, limit=%s, publication_ids=%s, country=%s",
+        dataset_id, from_date, to_date, site_ids, operator_keys, point_keys,
+        direction_keys, indicators, limit, publication_ids, country,
     )
 
-    client = NationalGasClient()
-
-    # ---------------- GAS QUALITY ----------------
-    if dataset_id == "GAS_QUALITY":
-        df = client.fetch_gas_quality(
-            from_date=from_date,
-            to_date=to_date,
-            site_ids=site_ids
+    if not registry.get(dataset_id):
+        raise ValueError(
+            f"No adapter registered for dataset_id={dataset_id!r}. "
+            f"Available: {registry.list_datasets()}"
         )
 
-    # ---------------- ENTSOG ----------------
-    elif dataset_id == "ENTSOG":
-        df = client.fetch_entsog(
-            from_date=from_date,
-            to_date=to_date,
-            operator_keys=operator_keys,
-            point_keys=point_keys,
-            direction_keys=direction_keys,
-            indicators=indicators,
-            limit=limit,
-        )
-    
-    # ---------------- INSTANTANEOUS FLOW ----------------        
-    elif dataset_id == "INSTANTANEOUS_FLOW":
-        df = client.fetch_instantaneous_flow(
-            from_date=from_date,
-            to_date=to_date,
-        )
-        
-    # ---------------- GAS PUBLICATIONS ----------------
-    elif dataset_id == "GAS_PUBLICATIONS":
-            df = client.fetch_gas_publications(
-                from_date=from_date,
-                to_date=to_date,
-                publication_ids=publication_ids
-            )
-
-
-    else:
-        raise ValueError(f"Unsupported dataset_id for API ingestion: {dataset_id}")
-
-    if df.empty:
-        logger.warning(f"No data returned for dataset={dataset_id}")
-        return
-
-    # 🧱 RAW (zero-loss)
-    ingest_raw_df(df, dataset_id)
-
-    # 🧠 DISCOVERY (auto schema)
-    discover_fields(dataset_id)
-
-    # 🔥 SERIES (auto-register)
-    series_map = register_series_from_df(df, dataset_id)
-    if not series_map:
-        logger.warning(f"No series registered for dataset={dataset_id}")
-        return
-
-    # 🔄 TRANSFORM + LOAD
-    for _, series_id in series_map.items():
-
-        if dataset_id == "GAS_QUALITY":
-            records = transform_gas_quality_rest(df, series_id)
-
-        elif dataset_id == "ENTSOG":
-            records = transform_entsog_rest(
-                df,
-                series_id,
-                from_date=from_date,
-                to_date=to_date,
-            )
-            
-        elif dataset_id == "INSTANTANEOUS_FLOW":
-            records = transform_instantaneous_flow(df, series_id)            
-
-        elif dataset_id == "GAS_PUBLICATIONS":
-            records = transform_gas_publications(df, series_id)
-
-        else:
-            logger.warning(f"No transformer for dataset={dataset_id}")
-            continue
-
-        if not records:
-            logger.warning(f"No transformed records for series_id={series_id}")
-            continue
-
-        upsert_observations(records)
-
-    logger.info(f"Completed ingestion for dataset={dataset_id}")
+    orch = Orchestrator(registry)
+    orch.run(
+        dataset_id,
+        from_date=from_date,
+        to_date=to_date,
+        site_ids=site_ids,
+        operator_keys=operator_keys,
+        point_keys=point_keys,
+        direction_keys=direction_keys,
+        indicators=indicators,
+        limit=limit,
+        publication_ids=publication_ids,
+        country=country,
+    )
+    logger.info("Completed ingestion for dataset=%s", dataset_id)
