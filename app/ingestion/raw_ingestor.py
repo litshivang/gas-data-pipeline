@@ -1,7 +1,7 @@
 from sqlalchemy import insert
 from app.db.connection import engine
 from app.utils.logger import logger
-from datetime import datetime
+from datetime import datetime, timezone
 import pandas as pd
 
 
@@ -36,7 +36,7 @@ def ingest_raw_df(
             "series_hint": payload.get("Data Item"),
             "event_time": None,
             "raw_payload": payload,
-            "ingested_at": datetime.utcnow(),
+            "ingested_at": datetime.now(timezone.utc),
         }
         rec["ingestion_run_id"] = run_id
         records.append(rec)
@@ -59,24 +59,22 @@ def ingest_raw_json(
     run_id: str | None = None,
 ) -> None:
     """Store one raw JSON payload (e.g. GIE API response)."""
-    from sqlalchemy import text
-    from sqlalchemy.dialects.postgresql import JSONB
 
     rec = {
         "source": source,
         "dataset_id": dataset_id,
         "series_hint": None,
         "event_time": None,
-        "raw_payload": payload,
-        "ingested_at": datetime.utcnow(),
+        "raw_payload": payload,  # JSONB handled by SQLAlchemy
+        "ingested_at": datetime.now(timezone.utc),
         "ingestion_run_id": run_id,
     }
-    sql = text("""
-        INSERT INTO raw_events (source, dataset_id, series_hint, event_time, raw_payload, ingested_at, ingestion_run_id)
-        VALUES (:source, :dataset_id, :series_hint, :event_time, :raw_payload, :ingested_at, :ingestion_run_id)
-    """)
+
+    stmt = insert(insert_raw_events()).values(rec)
+
     with engine.begin() as conn:
-        conn.execute(sql, rec)
+        conn.execute(stmt)
+
     logger.info("Raw-ingested 1 JSON row for %s", dataset_id)
 
 

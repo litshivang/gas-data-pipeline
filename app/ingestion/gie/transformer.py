@@ -19,6 +19,9 @@ def transform(dataset: str, raw_json: dict):
             if key in EXCLUDED_KEYS:
                 continue
 
+            # Skip lists (GIE often returns info: [])
+            if isinstance(value, list):
+                continue
             # -----------------------------
             # 🔥 Handle nested dicts (ALSI)
             # -----------------------------
